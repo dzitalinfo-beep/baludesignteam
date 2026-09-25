@@ -1,12 +1,29 @@
 {
   "name": "balu-design-team-app",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "expo-router/entry",
   "dependencies": {
-    "expo": "~57.0.24",
+    "@expo/metro-runtime": "~57.0.16",
+    "@react-native-community/datetimepicker": "9.1.0",
+    "axios": "^1.20.0",
+    "expo": "~57.0.25",
+    "expo-constants": "~57.0.19",
+    "expo-file-system": "~57.0.7",
+    "expo-linking": "~57.0.11",
+    "expo-location": "~57.0.20",
+    "expo-router": "~57.0.23",
+    "expo-secure-store": "~57.0.4",
+    "expo-sharing": "~57.0.22",
     "expo-status-bar": "~57.0.1",
+    "lucide-react-native": "^1.48.0",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "expo start",
@@ -14,5 +31,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
 }
