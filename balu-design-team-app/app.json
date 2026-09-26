@@ -22,17 +22,18 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "d51ff0bf-fd80-4ca2-9356-dc4e93dbab37"
+        "projectId": "4aadbaee-acda-4eb1-ade5-efc0a57e830c"
       }
     },
-    "owner": "hibujji123",
     "plugins": [
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
       "expo-sharing",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "owner": "veerababu1990"
   }
 }
