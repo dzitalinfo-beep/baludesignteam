@@ -1,6 +1,6 @@
 const CONFIG = {
   // Your PHP Backend URL
-  API_BASE_URL: "https://kirbilifesciences.com/dummy_baludesignteam_api",
+  API_BASE_URL: "https://kirbilifesciences.com/baludesignteam_api",
   
   // Your Project Security Key
   API_KEY: "dzitalinfo_balu_design",

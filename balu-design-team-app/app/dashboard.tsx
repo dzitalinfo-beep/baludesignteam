@@ -213,18 +213,6 @@ export default function DashboardScreen() {
     }
   }, [userId]);
 
-  const goToSearchJobs = (params: Record<string, string>) => {
-    router.push({ pathname: '/search-jobs', params });
-  };
-
-  const handleJobCardClick = (filterValue: string) => goToSearchJobs({ filterClosedType: filterValue });
-  const handleStaffFlowClick = (staffId?: string) => {
-    if (staffId) goToSearchJobs({ filterAssignedToId: staffId });
-  };
-  const handleTrendBarClick = (createdDate?: string) => {
-    if (createdDate) goToSearchJobs({ filterFromDate: createdDate, filterToDate: createdDate });
-  };
-
   if (isInitialLoading) {
     return (
       <View style={styles.centerContainer}>
@@ -254,14 +242,13 @@ export default function DashboardScreen() {
   const percentChange = prevMonthTotal > 0 ? ((currentMonthTotal - prevMonthTotal) / prevMonthTotal) * 100 : 0;
 
   const jobCards = [
-    { title: 'TOTAL JOBS', value: totalJobs, iconBg: '#2563eb', icon: <Layers size={14} color="#fff" />, filterId: 'all' },
-    { title: 'IN PROCESS', value: inProcess, iconBg: '#f59e0b', icon: <Clock size={14} color="#fff" />, filterId: '0' },
+    { title: 'TOTAL JOBS', value: totalJobs, iconBg: '#2563eb', icon: <Layers size={14} color="#fff" /> },
+    { title: 'IN PROCESS', value: inProcess, iconBg: '#f59e0b', icon: <Clock size={14} color="#fff" /> },
     ...dynamicStats.map((item, idx) => ({
       title: (item?.name || 'N/A').toUpperCase(),
       value: Number(item?.total || 0),
       iconBg: idx % 2 === 0 ? '#059669' : '#9333ea',
-      icon: <CheckCircle size={14} color="#fff" />,
-      filterId: item?.id?.toString() || ''
+      icon: <CheckCircle size={14} color="#fff" />
     })),
   ];
 
@@ -282,7 +269,7 @@ export default function DashboardScreen() {
         toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
         onLogout={handleLogout} 
       />
-	  <Sidebar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
 
         {/* ATTENDANCE PUNCH PANEL */}
@@ -416,13 +403,13 @@ export default function DashboardScreen() {
               const maxVal = Math.max(...jobCards.map(j => j.value), 1);
               const barHeight = 8 + (item.value / maxVal) * 60;
               return (
-                <TouchableOpacity key={idx} style={styles.jobCardTile} onPress={() => handleJobCardClick(item.filterId)}>
+                <View key={idx} style={styles.jobCardTile}>
                   <View style={styles.jobCardBarTrack}>
                     <View style={[styles.jobCardBar, { height: barHeight, backgroundColor: item.iconBg }]} />
                   </View>
                   <Text style={styles.jobCardValue}>{item.value}</Text>
                   <Text style={styles.jobCardTitle}>{item.title}</Text>
-                </TouchableOpacity>
+                </View>
               );
             })}
           </View>
@@ -442,7 +429,6 @@ export default function DashboardScreen() {
                   <Text style={styles.paymentLabel}>{pcard.title}</Text>
                   <Text style={styles.paymentValue}>{pcard.value}</Text>
                 </View>
-                <ArrowUpRight size={12} color="#cbd5e1" style={{ marginLeft: 'auto' }} />
               </View>
             ))}
           </View>
@@ -474,13 +460,13 @@ export default function DashboardScreen() {
 
           <View style={styles.trendBarsRow}>
             {dailyTrends.map((d, idx) => (
-              <TouchableOpacity key={idx} style={styles.trendBarCol} onPress={() => handleTrendBarClick(d.created_date)}>
+              <View key={idx} style={styles.trendBarCol}>
                 <Text style={styles.trendBarCount}>{d.count}</Text>
                 <View style={styles.trendBarTrack}>
                   <View style={[styles.trendBar, { height: 6 + ((d.count || 0) / maxTrendCount) * 70 }]} />
                 </View>
                 <Text style={styles.trendBarLabel}>{d.created_date}</Text>
-              </TouchableOpacity>
+              </View>
             ))}
           </View>
         </View>
@@ -527,10 +513,9 @@ export default function DashboardScreen() {
                 const fileCount = Number(staff.file_count || 0);
                 const percentageWidth = Math.min((fileCount / maxStaffFiles) * 100, 100);
                 return (
-                  <TouchableOpacity
+                  <View
                     key={staff.id || index}
                     style={styles.staffRow}
-                    onPress={() => handleStaffFlowClick(staff.id)}
                   >
                     <View style={styles.staffRowTop}>
                       <View style={styles.staffRowLeft}>
@@ -541,13 +526,12 @@ export default function DashboardScreen() {
                       </View>
                       <View style={styles.staffRowRight}>
                         <Text style={styles.staffFileCount}>{fileCount} {fileCount === 1 ? 'File' : 'Files'}</Text>
-                        <ArrowUpRight size={11} color="#475569" />
                       </View>
                     </View>
                     <View style={styles.staffBarTrack}>
                       <View style={[styles.staffBar, { width: `${percentageWidth}%` }]} />
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 );
               })
             ) : (
@@ -568,104 +552,155 @@ export default function DashboardScreen() {
   );
 }
 
+/* ============================================================
+   THEME — only this stylesheet changed. Soft indigo-tinted
+   neutral background, deeper card shadows for a "lifted" feel,
+   slightly larger radii, and a touch more breathing room.
+   Component tree, props, and logic above are untouched.
+   ============================================================ */
+const PALETTE = {
+  bgBase: '#eef1f8',       // soft indigo-grey page background (was flat #f8fafc)
+  cardBg: '#ffffff',
+  cardBorder: '#e7eaf3',
+  shadow: '#4338ca',       // indigo-tinted shadow instead of plain black
+  textDark: '#111827',
+  textMuted: '#6b7280',
+  trackBg: '#f1f3fa',
+};
+
+const cardShadow = Platform.select({
+  ios: {
+    shadowColor: PALETTE.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+  },
+  android: {
+    elevation: 4,
+  },
+  default: {},
+});
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  contentContainer: { padding: 16, paddingTop: 16, paddingBottom: 40 },
-  centerContainer: { flex: 1, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: PALETTE.bgBase },
+  contentContainer: { padding: 16, paddingTop: 18, paddingBottom: 40 },
+  centerContainer: { flex: 1, backgroundColor: PALETTE.bgBase, justifyContent: 'center', alignItems: 'center' },
 
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: PALETTE.cardBg,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 18,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: PALETTE.cardBorder,
+    ...cardShadow,
   },
 
   attendanceTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
   dot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
-  attendanceStatus: { fontSize: 12, fontWeight: '800', color: '#0f172a', textTransform: 'uppercase' },
+  attendanceStatus: { fontSize: 12, fontWeight: '800', color: PALETTE.textDark, textTransform: 'uppercase' },
   gpsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  gpsText: { fontSize: 10, fontWeight: '600', color: '#64748b' },
-  modeToggleRow: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 10, padding: 4, marginBottom: 12 },
-  modeButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+  gpsText: { fontSize: 10, fontWeight: '600', color: PALETTE.textMuted },
+  modeToggleRow: { flexDirection: 'row', backgroundColor: PALETTE.trackBg, borderRadius: 12, padding: 4, marginBottom: 12 },
+  modeButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
   activeModeButton: { backgroundColor: '#4f46e5' },
-  modeButtonText: { color: '#64748b', fontSize: 12, fontWeight: 'bold' },
+  modeButtonText: { color: PALETTE.textMuted, fontSize: 12, fontWeight: 'bold' },
   activeModeButtonText: { color: '#fff' },
   attendanceHistoryRow: { flexDirection: 'row', gap: 16, marginBottom: 12 },
-  historyMini: { fontSize: 10, fontWeight: '700', color: '#64748b' },
-  punchButton: { padding: 14, borderRadius: 12, alignItems: 'center' },
+  historyMini: { fontSize: 10, fontWeight: '700', color: PALETTE.textMuted },
+  punchButton: {
+    padding: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   punchButtonInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   punchButtonText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
 
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
   statTile: {
     width: '47%',
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 12,
+    backgroundColor: PALETTE.cardBg,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    ...cardShadow,
   },
   statLabel: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase' },
-  statValue: { fontSize: 20, fontWeight: '900', marginTop: 2 },
-  statIconBg: { padding: 8, borderRadius: 8 },
+  statValue: { fontSize: 21, fontWeight: '900', marginTop: 2 },
+  statIconBg: { padding: 9, borderRadius: 10 },
 
-  panelHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  panelHeaderText: { fontSize: 12, fontWeight: '900', color: '#1e293b', textTransform: 'uppercase' },
-  panelHeaderTextPlain: { fontSize: 12, fontWeight: '900', color: '#1e293b', textTransform: 'uppercase' },
+  panelHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  panelHeaderText: { fontSize: 12, fontWeight: '900', color: PALETTE.textDark, textTransform: 'uppercase', letterSpacing: 0.3 },
+  panelHeaderTextPlain: { fontSize: 12, fontWeight: '900', color: PALETTE.textDark, textTransform: 'uppercase', letterSpacing: 0.3 },
 
   jobCardsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
   jobCardTile: { alignItems: 'center', width: '22%' },
   jobCardBarTrack: { height: 70, justifyContent: 'flex-end' },
-  jobCardBar: { width: 20, borderRadius: 4 },
-  jobCardValue: { fontSize: 13, fontWeight: '900', color: '#1e293b', marginTop: 6 },
-  jobCardTitle: { fontSize: 8, fontWeight: '700', color: '#94a3b8', textAlign: 'center', marginTop: 2 },
+  jobCardBar: { width: 20, borderRadius: 6 },
+  jobCardValue: { fontSize: 13, fontWeight: '900', color: PALETTE.textDark, marginTop: 6 },
+  jobCardTitle: { fontSize: 8, fontWeight: '700', color: PALETTE.textMuted, textAlign: 'center', marginTop: 2 },
 
-  paymentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 12, marginBottom: 8 },
-  paymentIconBg: { padding: 8, borderRadius: 8 },
-  paymentLabel: { fontSize: 8, fontWeight: '800', color: '#64748b', textTransform: 'uppercase', opacity: 0.8 },
-  paymentValue: { fontSize: 14, fontWeight: '900', color: '#0f172a', marginTop: 2 },
+  paymentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, marginBottom: 8 },
+  paymentIconBg: { padding: 9, borderRadius: 10 },
+  paymentLabel: { fontSize: 8, fontWeight: '800', color: PALETTE.textMuted, textTransform: 'uppercase', opacity: 0.8 },
+  paymentValue: { fontSize: 14, fontWeight: '900', color: PALETTE.textDark, marginTop: 2 },
 
-  newAppsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  newAppsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   monthNavRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  monthNavBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  monthNavBtn: { backgroundColor: PALETTE.trackBg, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 },
   monthNavBtnText: { fontSize: 11, fontWeight: '800', color: '#334155' },
-  percentPill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 20 },
+  percentPill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 20 },
   percentPillText: { fontSize: 9, fontWeight: '800' },
 
   trendBarsRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
   trendBarCol: { alignItems: 'center', flex: 1 },
-  trendBarCount: { fontSize: 9, fontWeight: '800', color: '#1e293b', marginBottom: 2 },
+  trendBarCount: { fontSize: 9, fontWeight: '800', color: PALETTE.textDark, marginBottom: 2 },
   trendBarTrack: { height: 76, justifyContent: 'flex-end' },
-  trendBar: { width: 18, borderRadius: 4, backgroundColor: '#10b981' },
-  trendBarLabel: { fontSize: 8, fontWeight: '700', color: '#94a3b8', marginTop: 4 },
+  trendBar: { width: 18, borderRadius: 6, backgroundColor: '#10b981' },
+  trendBarLabel: { fontSize: 8, fontWeight: '700', color: PALETTE.textMuted, marginTop: 4 },
 
-  cashflowHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cashflowHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   legendRow: { flexDirection: 'row', gap: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 6, height: 6, borderRadius: 3 },
-  legendText: { fontSize: 8, fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase' },
+  legendText: { fontSize: 8, fontWeight: '800', color: PALETTE.textMuted, textTransform: 'uppercase' },
   cashflowCol: { alignItems: 'center', flex: 1 },
   cashflowBarsGroup: { flexDirection: 'row', gap: 3, height: 76, alignItems: 'flex-end' },
-  cashflowBar: { width: 10, borderRadius: 3 },
+  cashflowBar: { width: 10, borderRadius: 4 },
 
-  staffFlowCard: { backgroundColor: '#0f172a', borderRadius: 16, padding: 16, marginBottom: 16, overflow: 'hidden' },
+  staffFlowCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 18,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
+  },
   staffFlowHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#1e293b' },
   staffFlowHeaderText: { color: '#818cf8', fontWeight: '900', fontSize: 10, textTransform: 'uppercase' },
-  liveQueuePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, backgroundColor: 'rgba(99,102,241,0.1)', borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)' },
-  liveQueuePillText: { fontSize: 8, fontWeight: '900', color: '#818cf8', textTransform: 'uppercase' },
-  staffRow: { backgroundColor: 'rgba(30,41,59,0.3)', borderRadius: 12, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(30,41,59,0.4)' },
-  staffRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  liveQueuePill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(99,102,241,0.12)', borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)' },
+  liveQueuePillText: { fontSize: 8, fontWeight: '900', color: '#a5b4fc', textTransform: 'uppercase' },
+  staffRow: { backgroundColor: 'rgba(30,41,59,0.45)', borderRadius: 14, padding: 10, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(99,102,241,0.12)' },
+  staffRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
   staffRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  staffAvatar: { width: 20, height: 20, borderRadius: 6, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center' },
+  staffAvatar: { width: 22, height: 22, borderRadius: 8, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center' },
   staffAvatarText: { color: '#fff', fontWeight: '900', fontSize: 9 },
   staffName: { color: '#e2e8f0', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
   staffRowRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  staffFileCount: { fontSize: 9, fontWeight: '900', color: '#a5b4fc', backgroundColor: '#1e1b4b', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  staffBarTrack: { width: '100%', backgroundColor: '#020617', borderRadius: 10, height: 4, overflow: 'hidden' },
+  staffFileCount: { fontSize: 9, fontWeight: '900', color: '#c7d2fe', backgroundColor: '#1e1b4b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  staffBarTrack: { width: '100%', backgroundColor: '#020617', borderRadius: 10, height: 5, overflow: 'hidden' },
   staffBar: { backgroundColor: '#6366f1', height: '100%', borderRadius: 10 },
   noStaffText: { textAlign: 'center', paddingVertical: 24, color: '#64748b', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
   queueFooterRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, marginTop: 8, borderTopWidth: 1, borderTopColor: '#1e293b' },

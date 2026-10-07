@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,12 @@ import {
   ActivityIndicator,
   StyleSheet,
   Platform,
-  Alert
+  Alert,
+  Linking
 } from 'react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Sharing from 'expo-sharing';
-// expo-file-system (SDK 53+) moved cacheDirectory/writeAsStringAsync/EncodingType
-// into a "legacy" subpath; the new default export uses a different File/Directory API.
 import * as FileSystem from 'expo-file-system/legacy';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -23,7 +22,7 @@ import CONFIG from '../config';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import Footer from '../components/Footer';
-import { Calendar, ShieldCheck, Search, XCircle, FileSpreadsheet } from 'lucide-react-native';
+import { Calendar, ShieldCheck, Search, XCircle, FileSpreadsheet, Filter, ChevronDown, ChevronUp, Phone, MessageCircle } from 'lucide-react-native';
 
 const storage = {
   async get(key: string): Promise<string | null> {
@@ -41,10 +40,6 @@ const storage = {
   }
 };
 
-// Builds a YYYY-MM-DD string from LOCAL date parts, not UTC.
-// new Date().toISOString() converts to UTC first, which can silently shift
-// the calendar date depending on the device's timezone (e.g. India is
-// UTC+5:30) — that mismatch is why "today" could miss today's own rows.
 const toLocalDateString = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -52,11 +47,6 @@ const toLocalDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-// @react-native-community/datetimepicker has no web implementation, so
-// tapping the button did nothing in a browser. On web, render the browser's
-// own native <input type="date">, same as the calendar icon on the live site.
-// Built with React.createElement to avoid TSX intrinsic-element typing issues
-// in a React Native project.
 const WebDateInput = ({ value, onChange, style }: { value: string; onChange: (val: string) => void; style?: any }) => {
   return React.createElement('input', {
     type: 'date',
@@ -64,13 +54,15 @@ const WebDateInput = ({ value, onChange, style }: { value: string; onChange: (va
     onChange: (e: any) => onChange(e.target.value),
     style: {
       backgroundColor: '#0f172a',
-      borderRadius: 8,
-      padding: 10,
+      borderRadius: 10,
+      padding: '12px 14px',
       color: '#fff',
       fontSize: 13,
+      fontWeight: 'bold',
       border: '1px solid #334155',
       width: '100%',
       colorScheme: 'dark',
+      boxSizing: 'border-box',
       ...style
     }
   });
@@ -84,11 +76,16 @@ export default function DaySheetScreen() {
   const [sheetLogs, setSheetLogs] = useState<any[]>([]);
   const [userName, setUserName] = useState('Employee');
 
+  const [mandalList, setMandalList] = useState<any[]>([]);
+  const [serviceTypeList, setServiceTypeList] = useState<any[]>([]);
+  const [staffList, setStaffList] = useState<any[]>([]);
+
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const [filters, setFilters] = useState({
-    from_date: todayStr,
+    from_date: '2026-10-01',
     to_date: todayStr,
     file_no: '',
     mandal: '',
@@ -96,15 +93,34 @@ export default function DaySheetScreen() {
     handle_by: ''
   });
 
+  const [tableQuery, setTableQuery] = useState('');
+
   useEffect(() => {
     async function loadUser() {
       const name = await storage.get('user_name');
       if (name) setUserName(name);
     }
     loadUser();
+    loadMasterDataLists();
     fetchDaySheetLogs(filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadMasterDataLists = async () => {
+    try {
+      const [mRes, stRes, lRes] = await Promise.all([
+        axios.get(`${CONFIG.API_BASE_URL}/api.php?transac=get_mandals&api_key=${CONFIG.API_KEY}`).catch(() => ({ data: {} })),
+        axios.get(`${CONFIG.API_BASE_URL}/api.php?transac=get_main_services&api_key=${CONFIG.API_KEY}`).catch(() => ({ data: {} })),
+        axios.get(`${CONFIG.API_BASE_URL}/api.php?transac=get_logins&api_key=${CONFIG.API_KEY}`).catch(() => ({ data: {} }))
+      ]);
+
+      if (mRes.data?.mandals) setMandalList(mRes.data.mandals.map((m: any) => ({ value: m.name, label: m.name })));
+      if (stRes.data?.services) setServiceTypeList(stRes.data.services.map((s: any) => ({ value: s.name, label: s.name })));
+      if (lRes.data?.logins) setStaffList(lRes.data.logins.map((u: any) => ({ value: String(u.id), label: u.name })));
+    } catch (err) {
+      console.error("DaySheet Masters Load Exception:", err);
+    }
+  };
 
   const fetchDaySheetLogs = async (appliedFilters = filters) => {
     setLoading(true);
@@ -119,10 +135,7 @@ export default function DaySheetScreen() {
       }).toString();
 
       const url = `${CONFIG.API_BASE_URL}/api.php?api_key=${CONFIG.API_KEY}&transac=get_daysheet_report&${params}`;
-      console.log('fetchDaySheetLogs URL:', url.replace(CONFIG.API_KEY, '***'));
-
       const res = await axios.get(url, { timeout: 20000 });
-      console.log('fetchDaySheetLogs response:', res.data);
 
       if (res.data && res.data.status === 'success') {
         setSheetLogs(res.data.data || []);
@@ -130,7 +143,7 @@ export default function DaySheetScreen() {
         setSheetLogs([]);
       }
     } catch (err: any) {
-      console.log('DaySheet sync critical failure:', err.message, err.response?.data);
+      console.log('DaySheet sync critical failure:', err.message);
       setSheetLogs([]);
     } finally {
       setLoading(false);
@@ -151,11 +164,12 @@ export default function DaySheetScreen() {
       handle_by: ''
     };
     setFilters(defaultCleared);
+    setTableQuery('');
     fetchDaySheetLogs(defaultCleared);
   };
 
   const onFromDateChange = (event: any, selectedDate?: Date) => {
-    setShowFromPicker(Platform.OS === 'ios'); // iOS picker stays open inline; Android closes itself
+    setShowFromPicker(Platform.OS === 'ios');
     if (event.type === 'dismissed' || !selectedDate) return;
     handleFilterChange('from_date', toLocalDateString(selectedDate));
   };
@@ -166,24 +180,49 @@ export default function DaySheetScreen() {
     handleFilterChange('to_date', toLocalDateString(selectedDate));
   };
 
-  // --- MOBILE-SAFE EXCEL EXPORT HELPER ---
-  // Fixed: the previous version used XLSX's "binary" output plus a manual
-  // btoa() conversion. btoa() does not exist in the React Native/Hermes JS
-  // engine (it's a browser/Node global), so this threw
-  // "ReferenceError: btoa is not defined" on-device or in Expo Go.
-  // XLSX can emit base64 directly, so we skip the manual conversion entirely.
+  const handleCall = (mobile: string) => {
+    if (!mobile) return;
+    Linking.openURL(`tel:${mobile}`);
+  };
+
+  const handleWhatsApp = (mobile: string) => {
+    if (!mobile) return;
+    const formatted = mobile.replace(/[^0-9]/g, '');
+    const url = `https://wa.me/91${formatted}`;
+    Linking.openURL(url);
+  };
+
+  const filteredSheetLogs = useMemo(() => {
+    if (!tableQuery.trim()) return sheetLogs;
+    const q = tableQuery.toLowerCase();
+    return sheetLogs.filter(log => 
+      (log.file_no && log.file_no.toLowerCase().includes(q)) ||
+      (log.b_a_number && log.b_a_number.toLowerCase().includes(q)) ||
+      (log.owner && log.owner.toLowerCase().includes(q)) ||
+      (log.ref_name && log.ref_name.toLowerCase().includes(q)) ||
+      (log.mobile && log.mobile.toLowerCase().includes(q)) ||
+      (log.mandal && log.mandal.toLowerCase().includes(q)) ||
+      (log.service_type && log.service_type.toLowerCase().includes(q)) ||
+      (log.staff_name && log.staff_name.toLowerCase().includes(q)) ||
+      (log.narrative_note && log.narrative_note.toLowerCase().includes(q))
+    );
+  }, [sheetLogs, tableQuery]);
+
   const handleExportToExcel = async () => {
-    if (sheetLogs.length === 0) {
+    if (filteredSheetLogs.length === 0) {
       Alert.alert('Empty Ledger', 'No records available to compile into Excel.');
       return;
     }
     try {
-      const simplifiedRows = sheetLogs.map((log, idx) => ({
+      const simplifiedRows = filteredSheetLogs.map((log, idx) => ({
         "S.No": idx + 1,
         "Date": log.created_date,
         "Time": log.created_time,
         "File Ref": log.file_no,
+        "BA Number": log.b_a_number,
         "Owner": log.owner,
+        "Ref Name": log.ref_name,
+        "Mobile": log.mobile,
         "Mandal": log.mandal,
         "Service": log.service_type,
         "Context": log.tracking_level,
@@ -196,9 +235,7 @@ export default function DaySheetScreen() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "DaySheet_Logs");
 
-      // Ask XLSX for base64 directly — no btoa() needed, works on native.
       const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-
       const uri = FileSystem.cacheDirectory + 'DaySheet_Report.xlsx';
       await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
 
@@ -244,73 +281,182 @@ export default function DaySheetScreen() {
           </View>
         </View>
 
-        {/* Filter Inputs Form Card */}
+        {/* Collapsible Filter Inputs Form Card (Default Closed) */}
         <View style={styles.filterCard}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.label}>From Date</Text>
-            {Platform.OS === 'web' ? (
-              <WebDateInput value={filters.from_date} onChange={(val) => handleFilterChange('from_date', val)} />
-            ) : (
-              <>
-                <TouchableOpacity style={styles.dateInput} onPress={() => setShowFromPicker(true)}>
-                  <Text style={styles.dateInputText}>{filters.from_date || 'Select date'}</Text>
-                  <Calendar size={14} color="#94a3b8" />
-                </TouchableOpacity>
-                {showFromPicker && (
-                  <DateTimePicker
-                    value={filters.from_date ? new Date(filters.from_date) : new Date()}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                    onChange={onFromDateChange}
-                  />
-                )}
-              </>
-            )}
-          </View>
+          <TouchableOpacity 
+            style={styles.filterCardHeader} 
+            onPress={() => setFiltersExpanded(!filtersExpanded)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.filterHeaderLeft}>
+              <Filter size={15} color="#38bdf8" />
+              <Text style={styles.filterHeaderTitle}>Report Query Filters</Text>
+            </View>
+            {filtersExpanded ? <ChevronUp size={18} color="#94a3b8" /> : <ChevronDown size={18} color="#94a3b8" />}
+          </TouchableOpacity>
 
-          <View style={styles.filterGroup}>
-            <Text style={styles.label}>To Date</Text>
-            {Platform.OS === 'web' ? (
-              <WebDateInput value={filters.to_date} onChange={(val) => handleFilterChange('to_date', val)} />
-            ) : (
-              <>
-                <TouchableOpacity style={styles.dateInput} onPress={() => setShowToPicker(true)}>
-                  <Text style={styles.dateInputText}>{filters.to_date || 'Select date'}</Text>
-                  <Calendar size={14} color="#94a3b8" />
-                </TouchableOpacity>
-                {showToPicker && (
-                  <DateTimePicker
-                    value={filters.to_date ? new Date(filters.to_date) : new Date()}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                    onChange={onToDateChange}
-                  />
-                )}
-              </>
-            )}
-          </View>
+          {filtersExpanded && (
+            <View style={styles.filterExpandedContent}>
+              <View style={styles.filterGrid}>
+                <View style={styles.filterGroup}>
+                  <Text style={styles.label}>From Date</Text>
+                  {Platform.OS === 'web' ? (
+                    <WebDateInput value={filters.from_date} onChange={(val) => handleFilterChange('from_date', val)} />
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.dateInput} onPress={() => setShowFromPicker(true)}>
+                        <Text style={styles.dateInputText}>{filters.from_date || 'Select date'}</Text>
+                        <Calendar size={14} color="#94a3b8" />
+                      </TouchableOpacity>
+                      {showFromPicker && (
+                        <DateTimePicker
+                          value={filters.from_date ? new Date(filters.from_date) : new Date()}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                          onChange={onFromDateChange}
+                        />
+                      )}
+                    </>
+                  )}
+                </View>
 
-          <View style={styles.filterGroup}>
-            <Text style={styles.label}>File Reference No</Text>
+                <View style={styles.filterGroup}>
+                  <Text style={styles.label}>To Date</Text>
+                  {Platform.OS === 'web' ? (
+                    <WebDateInput value={filters.to_date} onChange={(val) => handleFilterChange('to_date', val)} />
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.dateInput} onPress={() => setShowToPicker(true)}>
+                        <Text style={styles.dateInputText}>{filters.to_date || 'Select date'}</Text>
+                        <Calendar size={14} color="#94a3b8" />
+                      </TouchableOpacity>
+                      {showToPicker && (
+                        <DateTimePicker
+                          value={filters.to_date ? new Date(filters.to_date) : new Date()}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                          onChange={onToDateChange}
+                        />
+                      )}
+                    </>
+                  )}
+                </View>
+
+                <View style={styles.filterGroup}>
+                  <Text style={styles.label}>File Reference No / BA No</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={filters.file_no}
+                    onChangeText={val => handleFilterChange('file_no', val)}
+                    placeholder="Search File Ref / BA No..."
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+
+                <View style={styles.filterGroup}>
+                  <Text style={styles.label}>Zone Mandal</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={styles.webSelect}
+                      value={filters.mandal}
+                      onChange={(e) => handleFilterChange('mandal', e.target.value)}
+                    >
+                      <option value="">All Mandals</option>
+                      {mandalList.map((m, i) => (
+                        <option key={i} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput
+                      style={styles.input}
+                      value={filters.mandal}
+                      onChangeText={val => handleFilterChange('mandal', val)}
+                      placeholder="Enter Mandal..."
+                      placeholderTextColor="#94a3b8"
+                    />
+                  )}
+                </View>
+
+                <View style={styles.filterGroup}>
+                  <Text style={styles.label}>Service Category</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={styles.webSelect}
+                      value={filters.service_type}
+                      onChange={(e) => handleFilterChange('service_type', e.target.value)}
+                    >
+                      <option value="">All Services</option>
+                      {serviceTypeList.map((s, i) => (
+                        <option key={i} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput
+                      style={styles.input}
+                      value={filters.service_type}
+                      onChangeText={val => handleFilterChange('service_type', val)}
+                      placeholder="Enter Service..."
+                      placeholderTextColor="#94a3b8"
+                    />
+                  )}
+                </View>
+
+                <View style={styles.filterGroup}>
+                  <Text style={[styles.label, { color: '#38bdf8' }]}>Handle By Staff</Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      style={styles.webSelect}
+                      value={filters.handle_by}
+                      onChange={(e) => handleFilterChange('handle_by', e.target.value)}
+                    >
+                      <option value="">All Operators</option>
+                      {staffList.map((st, i) => (
+                        <option key={i} value={st.value}>{st.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput
+                      style={styles.input}
+                      value={filters.handle_by}
+                      onChangeText={val => handleFilterChange('handle_by', val)}
+                      placeholder="Staff ID / Name..."
+                      placeholderTextColor="#94a3b8"
+                    />
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={styles.searchButton} onPress={() => fetchDaySheetLogs()}>
+                  <Search size={14} color="#fff" />
+                  <Text style={styles.searchButtonText}>Execute Search</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.resetButton} onPress={resetAllReportFilters}>
+                  <XCircle size={18} color="#f43f5e" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Post-Execution Search Box for Results */}
+        {!loading && sheetLogs.length > 0 && (
+          <View style={styles.postSearchCard}>
+            <Filter size={15} color="#38bdf8" />
             <TextInput
-              style={styles.input}
-              value={filters.file_no}
-              onChangeText={val => handleFilterChange('file_no', val)}
-              placeholder="Search File Ref..."
+              style={styles.postSearchInput}
+              value={tableQuery}
+              onChangeText={setTableQuery}
+              placeholder="Search loaded records (File No, BA No, Owner, Mobile, Notes)..."
               placeholderTextColor="#94a3b8"
             />
+            {tableQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setTableQuery('')}>
+                <XCircle size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
           </View>
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.searchButton} onPress={() => fetchDaySheetLogs()}>
-              <Search size={14} color="#fff" />
-              <Text style={styles.searchButtonText}>Execute Search</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.resetButton} onPress={resetAllReportFilters}>
-              <XCircle size={18} color="#f43f5e" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
 
         {/* Records List Container */}
         {loading ? (
@@ -320,17 +466,44 @@ export default function DaySheetScreen() {
           </View>
         ) : (
           <View style={styles.tableContainer}>
-            <Text style={styles.countIndicator}>Recorded Logs: [{sheetLogs.length}]</Text>
-            {sheetLogs.length > 0 ? (
-              sheetLogs.map((log, index) => (
+            <Text style={styles.countIndicator}>
+              Showing [{filteredSheetLogs.length}] of [{sheetLogs.length}] Recorded Logs
+            </Text>
+            {filteredSheetLogs.length > 0 ? (
+              filteredSheetLogs.map((log, index) => (
                 <View key={index} style={styles.rowCard}>
                   <View style={styles.rowTop}>
-                    <Text style={styles.fileNoText}>{log.file_no}</Text>
+                    <Text style={styles.fileNoText}>
+                      {log.file_no} {log.b_a_number ? `(${log.b_a_number})` : ''}
+                    </Text>
                     <Text style={styles.dateText}>{log.created_date} {log.created_time}</Text>
                   </View>
+
                   <Text style={styles.ownerText}>Owner: {log.owner}</Text>
+                  
+                  {log.ref_name ? (
+                    <Text style={styles.refNameText}>Ref Name: {log.ref_name}</Text>
+                  ) : null}
+
+                  {log.mobile ? (
+                    <View style={styles.mobileRow}>
+                      <Text style={styles.mobileText}>📱 {log.mobile}</Text>
+                      <View style={styles.actionButtons}>
+                        <TouchableOpacity style={styles.callBtn} onPress={() => handleCall(log.mobile)}>
+                          <Phone size={12} color="#fff" />
+                          <Text style={styles.actionText}>Call</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.waBtn} onPress={() => handleWhatsApp(log.mobile)}>
+                          <MessageCircle size={12} color="#fff" />
+                          <Text style={styles.actionText}>WhatsApp</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
+
                   <Text style={styles.serviceText}>Mandal: {log.mandal} | Service: {log.service_type}</Text>
                   <Text style={styles.noteText} numberOfLines={2}>Note: {log.narrative_note}</Text>
+                  
                   <View style={styles.rowBottom}>
                     <View style={styles.handlerRow}>
                       <ShieldCheck size={12} color="#10b981" />
@@ -341,7 +514,7 @@ export default function DaySheetScreen() {
                 </View>
               ))
             ) : (
-              <Text style={styles.noDataText}>No operational interaction logs found for this date criteria.</Text>
+              <Text style={styles.noDataText}>No operational interaction logs found matching your search criteria.</Text>
             )}
           </View>
         )}
@@ -359,28 +532,43 @@ const styles = StyleSheet.create({
   titleContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pageTitle: { color: '#f8fafc', fontSize: 15, fontWeight: '900', textTransform: 'uppercase' },
   exportButtonsRow: { flexDirection: 'row', gap: 8 },
-  exportBtn: { backgroundColor: '#1e293b', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  filterCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#334155', gap: 10 },
-  filterGroup: { gap: 4 },
-  label: { color: '#94a3b8', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
-  input: { backgroundColor: '#0f172a', borderRadius: 8, padding: 10, color: '#fff', fontSize: 13, borderWidth: 1, borderColor: '#334155' },
-  dateInput: { backgroundColor: '#0f172a', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#334155', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dateInputText: { color: '#fff', fontSize: 13 },
-  buttonRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  searchButton: { flex: 1, backgroundColor: '#3b82f6', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 8, gap: 6 },
-  searchButtonText: { color: '#fff', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
-  resetButton: { backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
+  exportBtn: { backgroundColor: '#1e293b', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
+  filterCard: { backgroundColor: '#1e293b', borderRadius: 16, marginBottom: 14, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' },
+  filterCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#1e293b' },
+  filterHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterHeaderTitle: { color: '#f8fafc', fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  filterExpandedContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 12, borderTopWidth: 1, borderTopColor: '#334155', paddingTop: 12 },
+  filterGrid: { gap: 12 },
+  filterGroup: { gap: 5 },
+  label: { color: '#94a3b8', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, color: '#fff', fontSize: 13, borderWidth: 1, borderColor: '#334155' },
+  webSelect: { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, color: '#fff', fontSize: 13, border: '1px solid #334155', width: '100%', fontWeight: 'bold' } as any,
+  dateInput: { backgroundColor: '#0f172a', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#334155', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dateInputText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  buttonRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  searchButton: { flex: 1, backgroundColor: '#3b82f6', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 13, borderRadius: 10, gap: 6 },
+  searchButtonText: { color: '#fff', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  resetButton: { backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
+  postSearchCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16, borderWidth: 1, borderColor: '#334155', gap: 10 },
+  postSearchInput: { flex: 1, color: '#fff', fontSize: 13, padding: 4 },
   centerContainer: { padding: 40, alignItems: 'center' },
   loadingText: { color: '#94a3b8', fontSize: 12, marginTop: 8 },
-  tableContainer: { gap: 10 },
-  countIndicator: { color: '#38bdf8', fontSize: 11, fontWeight: 'bold', marginBottom: 4, textTransform: 'uppercase' },
-  rowCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#334155', gap: 4 },
+  tableContainer: { gap: 12 },
+  countIndicator: { color: '#38bdf8', fontSize: 11, fontWeight: 'bold', marginBottom: 2, textTransform: 'uppercase' },
+  rowCard: { backgroundColor: '#1e293b', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#334155', gap: 6 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
   fileNoText: { color: '#38bdf8', fontSize: 13, fontWeight: 'bold' },
   dateText: { color: '#64748b', fontSize: 10 },
   ownerText: { color: '#e2e8f0', fontSize: 12, fontWeight: '600' },
+  refNameText: { color: '#38bdf8', fontSize: 11, fontWeight: '600' },
+  mobileRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f172a', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
+  mobileText: { color: '#cbd5e1', fontSize: 11, fontWeight: 'bold' },
+  actionButtons: { flexDirection: 'row', gap: 6 },
+  callBtn: { backgroundColor: '#059669', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  waBtn: { backgroundColor: '#25D366', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  actionText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
   serviceText: { color: '#94a3b8', fontSize: 11 },
-  noteText: { color: '#cbd5e1', fontSize: 11, fontStyle: 'italic', marginVertical: 4 },
+  noteText: { color: '#cbd5e1', fontSize: 11, fontStyle: 'italic', marginVertical: 2 },
   rowBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#334155', paddingTop: 8, marginTop: 4 },
   handlerRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   handlerText: { color: '#cbd5e1', fontSize: 11, fontWeight: 'bold' },

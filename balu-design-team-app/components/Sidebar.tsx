@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { router, usePathname } from 'expo-router';
-import { LayoutDashboard, FileText, Calendar, X } from 'lucide-react-native';
+import { LayoutDashboard, Search, Calendar, FileText, X } from 'lucide-react-native';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -17,6 +17,7 @@ export default function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
   const menuItems = [
     { name: 'Dashboard', route: '/dashboard', icon: <LayoutDashboard size={18} color="#cbd5e1" /> },
+    { name: 'Search Jobs', route: '/search-jobs', icon: <Search size={18} color="#cbd5e1" /> },
     { name: 'Day Sheet', route: '/daysheet', icon: <Calendar size={18} color="#cbd5e1" /> },
     { name: 'Outstanding Report', route: '/outstanding-report', icon: <FileText size={18} color="#cbd5e1" /> },
   ];
@@ -26,7 +27,7 @@ export default function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={toggleSidebar} />
       <View style={styles.drawer}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Navigation Menu</Text>
+          <Text style={styles.headerTitle}>Balu design team</Text>
           <TouchableOpacity onPress={toggleSidebar} style={styles.closeBtn}>
             <X size={20} color="#fff" />
           </TouchableOpacity>

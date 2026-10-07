@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "438549165962",
+    "project_id": "baludesignteam-b7d39",
+    "storage_bucket": "baludesignteam-b7d39.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:438549165962:android:8e372cf839d94fc6473a73",
+        "android_client_info": {
+          "package_name": "com.baludesignteam.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOOJCRr5Xali4u9RopcMKtGB-mm8aPHyQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:438549165962:android:bf81d52afe524efa473a73",
+        "android_client_info": {
+          "package_name": "com.hibujji123.baludesignteam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOOJCRr5Xali4u9RopcMKtGB-mm8aPHyQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
