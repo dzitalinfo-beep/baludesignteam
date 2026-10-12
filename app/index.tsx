@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import CONFIG from '../config';
+import { registerAndSavePushToken } from '../utils/usePushNotifications';
 
 // SecureStore does NOT work on web, so fall back to localStorage there.
 // (On web, SecureStore throws, which would look like a "Network Error" even
@@ -91,13 +92,16 @@ export default function LoginScreen() {
       console.log('Parsed result:', result);
 
       if (result.status === 'success') {
-        await storage.set('isAuthenticated', 'true');
-        await storage.set('user_id', result.user.id);
-        await storage.set('user_name', result.user.name);
-        await storage.set('user_type', result.user.user_type);
+  await storage.set('isAuthenticated', 'true');
+  await storage.set('user_id', result.user.id);
+  await storage.set('user_name', result.user.name);
+  await storage.set('user_type', result.user.user_type);
 
-        router.replace('/dashboard');
-      } else {
+  // Get the Firebase (FCM) token and save it for this user
+  registerAndSavePushToken(String(result.user.id));
+
+  router.replace('/dashboard');
+}else {
         Alert.alert(
           'Access Denied',
           result.message || 'Invalid username or password.'
