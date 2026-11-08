@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import * as Clipboard from 'expo-clipboard';
 import axios from 'axios';
 import CONFIG from '../config';
 
@@ -16,32 +17,53 @@ Notifications.setNotificationHandler({
 });
 
 async function saveTokenToBackend(userId: string, token: string) {
+  if (!userId || userId === '0' || userId === 'null') {
+    console.log('Skipping token save: Invalid User ID');
+    return;
+  }
+
   try {
-    const response = await axios.get(`${CONFIG.API_BASE_URL}/api.php`, {
-      params: {
-        api_key: CONFIG.API_KEY,
-        transac: 'save_push_token',
-        user_id: userId,
+    const url = `${CONFIG.API_BASE_URL}/api.php?api_key=${CONFIG.API_KEY}&transac=save_push_token`;
+    console.log('Sending token via POST to URL:', url, { user_id: userId, token_length: token.length });
+
+    const response = await axios.post(
+      url,
+      {
+        user_id: String(userId),
         push_token: token,
       },
-    });
-    console.log('Token saved to backend:', response.data);
-   // alert('Success: Token saved to database!');
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        timeout: 15000,
+      }
+    );
+
+    console.log('Token saved to backend response:', response.data);
+
+    if (response.data && response.data.status === 'success') {
+      Alert.alert('Database Success', 'Token successfully saved to MySQL database!');
+    } else {
+      Alert.alert('PHP Server Error', 'Response: ' + JSON.stringify(response.data));
+    }
   } catch (err: any) {
-    console.error('Failed to save push token', err.message);
-    alert('API Error (Save Failed): ' + (err.message || 'Unknown error'));
+    console.error('Failed to save push token on server', err);
+    let errorMsg = err.message;
+    if (err.response) {
+      errorMsg = `Server Status ${err.response.status}: ${JSON.stringify(err.response.data)}`;
+    }
+    Alert.alert('Database/API Failed', errorMsg);
   }
 }
 
-// Gets the native Firebase (FCM) token on Android
 async function getFcmToken(): Promise<string | null> {
   if (!Device.isDevice) {
-    alert('Error: Must use a physical device for notifications.');
     return null;
   }
 
   if (Platform.OS === 'android') {
-    // Channel must exist before asking permission on Android 13+
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
       importance: Notifications.AndroidImportance.MAX,
@@ -55,38 +77,43 @@ async function getFcmToken(): Promise<string | null> {
     finalStatus = status;
   }
   if (finalStatus !== 'granted') {
-    alert('Error: Notification permission was denied.');
     return null;
   }
 
   try {
     const tokenData = await Notifications.getDevicePushTokenAsync();
     const token = tokenData.data as string;
-    alert('FCM Token: ' + token.substring(0, 15) + '...');
+    
+    console.log('Full Raw Native FCM Token:', token);
+    await Clipboard.setStringAsync(token);
+
     return token;
   } catch (e: any) {
-    alert('Token Fetch Exception: ' + (e.message || JSON.stringify(e)));
+    console.error('Token Fetch Exception:', e);
     return null;
   }
 }
 
-// Call this right after login
 export async function registerAndSavePushToken(userId: string) {
+  if (!userId || userId === '0') return;
   const token = await getFcmToken();
-  if (token) await saveTokenToBackend(userId, token);
+  if (token) {
+    await saveTokenToBackend(userId, token);
+  }
 }
 
-// Runs on app start for users who are already logged in
 export function usePushNotifications(userId: string | null) {
   useEffect(() => {
-    if (!userId || userId === '0') return;
+    if (!userId || userId === '0' || userId === 'null') return;
 
     registerAndSavePushToken(userId);
 
-    // Re-save if Firebase rotates the token
     const sub = Notifications.addPushTokenListener(t => {
-      saveTokenToBackend(userId, t.data as string);
+      if (t?.data) {
+        saveTokenToBackend(userId, t.data as string);
+      }
     });
+
     return () => sub.remove();
   }, [userId]);
 }

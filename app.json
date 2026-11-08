@@ -43,7 +43,9 @@
           "icon": "./assets/icon.png",
           "color": "#3b82f6"
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "owner": "veerababu1990"
   }
